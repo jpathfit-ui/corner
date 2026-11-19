@@ -1,0 +1,387 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Corner Clip Maker</title>
+<style>
+:root { --bg:#050506; --card:#15161a; --card2:#1d1f24; --line:#2a2c32; --silver:#c4c8ce; --hi:#eef0f3; --mute:#8a8e97; --red:#ff5a5a; }
+* { box-sizing: border-box; }
+body { margin:0; background:var(--bg); color:var(--silver); font:16px/1.4 -apple-system, "Helvetica Neue", Arial, sans-serif; }
+main { max-width: 760px; margin: 0 auto; padding: 22px 16px 60px; }
+h1 { font-size: 22px; letter-spacing:.08em; text-transform:uppercase; color:var(--hi); margin:0 0 6px; }
+h2 { font-size: 12px; letter-spacing:.16em; text-transform:uppercase; color:var(--mute); margin:24px 2px 8px; }
+.card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px; margin-bottom:10px; }
+label { display:block; font-size:12px; letter-spacing:.1em; text-transform:uppercase; color:var(--mute); margin:12px 0 5px; font-weight:700; }
+label:first-child { margin-top:0; }
+input, select { width:100%; background:#0c0d0f; color:var(--hi); border:1px solid var(--line); border-radius:10px; padding:11px; font:inherit; }
+input[type=checkbox] { width:auto; margin-right:8px; }
+.check { display:flex; align-items:center; margin-top:12px; color:var(--silver); font-size:15px; text-transform:none; letter-spacing:0; }
+.grid3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
+.grid2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.note { color:var(--mute); font-size:13.5px; margin:6px 0 0; }
+.btns { display:flex; flex-wrap:wrap; gap:10px; margin-top:12px; }
+button { font:inherit; font-weight:800; letter-spacing:.06em; text-transform:uppercase; border:1px solid var(--line); background:var(--card2); color:var(--hi); border-radius:12px; min-height:48px; padding:0 16px; cursor:pointer; flex:1; min-width:140px; }
+button.primary { background:linear-gradient(180deg,#f4f5f7,#9ea2a9); color:#08090a; border:0; }
+button.danger { color:#ff8585; background:#1b0f10; border-color:#4a1d20; }
+button:disabled { opacity:.4; cursor:not-allowed; }
+.bar { height:8px; background:#1b1d21; border-radius:4px; overflow:hidden; margin:10px 0 4px; }
+.bar i { display:block; height:100%; width:0; background:var(--silver); transition:width .2s; }
+#log { background:#0a0b0d; border:1px solid var(--line); border-radius:10px; padding:10px; height:260px; overflow:auto; font:13px/1.45 ui-monospace, Menlo, monospace; white-space:pre-wrap; }
+#log .err { color:var(--red); } #log .ok { color:#9fe3b0; }
+table { width:100%; border-collapse:collapse; font-size:14px; }
+td, th { text-align:left; padding:6px 4px; border-top:1px solid var(--line); vertical-align:top; }
+th { color:var(--mute); font-size:12px; letter-spacing:.08em; text-transform:uppercase; border-top:0; }
+.stat { color:var(--hi); font-weight:700; }
+audio { width:100%; margin-top:10px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Corner Clip Maker</h1>
+  <p class="note">Makes the coach voice clips with ElevenLabs, most important first, and stops before your credits run out. Clips are saved in this browser as they are made, so closing the page never wastes credits. Run it again later and it carries on where it stopped.</p>
+
+  <h2>Setup</h2>
+  <div class="card">
+    <label for="key">ElevenLabs API Key</label>
+    <input id="key" type="password" autocomplete="off" placeholder="Paste your API key">
+    <div class="check"><input type="checkbox" id="remember"><span>Remember the key on this computer</span></div>
+    <div class="grid2">
+      <div><label for="voiceId">Voice ID</label><input id="voiceId" placeholder="From the voice in My Voices"></div>
+      <div><label for="folder">Which Coach Is This?</label>
+        <select id="folder"><option value="m1">Male Coach</option><option value="f1">Female Coach</option></select></div>
+    </div>
+    <div class="grid2">
+      <div><label for="model">Model</label><input id="model" value="eleven_v3"></div>
+      <div><label for="stability">Stability (v3)</label>
+        <select id="stability"><option value="0">Creative (most expressive)</option><option value="0.5">Natural</option><option value="1">Robust (most steady)</option></select></div>
+    </div>
+    <div class="grid3">
+      <div><label for="spCalm">Speed Calm</label><input id="spCalm" type="number" step="0.05" min="0.7" max="1.2" value="1"></div>
+      <div><label for="spFirm">Speed Firm</label><input id="spFirm" type="number" step="0.05" min="0.7" max="1.2" value="1.1"></div>
+      <div><label for="spUrgent">Speed Urgent</label><input id="spUrgent" type="number" step="0.05" min="0.7" max="1.2" value="1.2"></div>
+    </div>
+    <div class="check"><input type="checkbox" id="tags" checked><span>Add delivery tags like [shouting] (needs Eleven v3 or newer)</span></div>
+    <div class="grid2">
+      <div><label for="reserve">Credits to Keep in Reserve</label><input id="reserve" type="number" value="200" min="0"></div>
+      <div><label for="avail">Credits Available (used only if they cannot be read)</label><input id="avail" type="number" value="10000" min="0"></div>
+    </div>
+  </div>
+
+  <h2>Step 1: Check and Test</h2>
+  <div class="card">
+    <div class="btns"><button id="btnCredits">Check Credits</button></div>
+    <div id="credits" class="note">Credits not checked yet.</div>
+    <label for="testPick">Test One Clip</label>
+    <div class="grid2">
+      <select id="testPick">
+        <option value="firm|Jab, cross, hook, cross">Firm: Jab, cross, hook, cross</option>
+        <option value="urgent|Jab, cross, hook, cross">Urgent: Jab, cross, hook, cross</option>
+        <option value="firm|Hands up">Firm: Hands up</option>
+        <option value="urgent|Empty the tank">Urgent: Empty the tank</option>
+        <option value="calm|Recovery round. Your pace.">Calm: Recovery round. Your pace.</option>
+        <option value="firm|Do not get sloppy">Firm: Do not get sloppy (needling)</option>
+      </select>
+      <button id="btnTest" class="primary">Make and Play</button>
+    </div>
+    <div id="testInfo" class="note">A test clip is a real clip. It is kept, so it is not wasted.</div>
+    <audio id="player" controls hidden></audio>
+  </div>
+
+  <h2>Step 2: Plan</h2>
+  <div class="card">
+    <div class="btns"><button id="btnPlan">Show Plan</button></div>
+    <div id="plan" class="note">The plan lists each group in the order it will be made.</div>
+  </div>
+
+  <h2>Step 3: Generate</h2>
+  <div class="card">
+    <div class="btns">
+      <button id="btnStart" class="primary">Start Generating</button>
+      <button id="btnStop" class="danger" disabled>Stop</button>
+    </div>
+    <div class="bar"><i id="barfill"></i></div>
+    <div id="progress" class="note">Not started.</div>
+    <div id="log" aria-live="polite"></div>
+  </div>
+
+  <h2>Step 4: Download</h2>
+  <div class="card">
+    <div class="btns">
+      <button id="btnZip" class="primary">Download Clips Zip</button>
+      <button id="btnClear" class="danger">Clear Saved Clips</button>
+    </div>
+    <div id="saved" class="note">No clips saved yet.</div>
+    <p class="note">Unzip into your Corner folder so the <b>audio</b> folder merges, then upload to GitHub. The zip includes the manifest that tells the app which clips exist.</p>
+    <label for="oldManifest">Already Have Clips From Before? Add Their Manifest</label>
+    <input id="oldManifest" type="file" accept=".json">
+    <p class="note">Optional. Choose your existing audio/manifest.json so the new manifest lists both old and new clips, and nothing is generated twice.</p>
+  </div>
+</main>
+
+<script src="../data.js"></script>
+<script src="../coach.js"></script>
+<script src="clipjobs.js"></script>
+<script>
+(function () {
+  'use strict';
+  var J = window.CornerClipJobs, D = window.CornerData;
+  var API = new URLSearchParams(location.search).get('api') || 'https://api.elevenlabs.io';
+  var $ = function (id) { return document.getElementById(id); };
+  var stopFlag = false, running = false, speedLevel = 0, rate = 1, creditInfo = null;
+  var mem = {};          // key -> { blob, say, chars }
+  var oldKeys = {};      // keys from a manifest the user loaded
+
+  // ---- settings persistence (key only if asked) ----
+  function save() {
+    try {
+      var s = { voiceId: $('voiceId').value, folder: $('folder').value, model: $('model').value, stability: $('stability').value,
+        spCalm: $('spCalm').value, spFirm: $('spFirm').value, spUrgent: $('spUrgent').value, tags: $('tags').checked,
+        reserve: $('reserve').value, avail: $('avail').value, remember: $('remember').checked };
+      localStorage.setItem('cornerClipMaker', JSON.stringify(s));
+      if ($('remember').checked) localStorage.setItem('cornerClipKey', $('key').value); else localStorage.removeItem('cornerClipKey');
+    } catch (e) {}
+  }
+  function load() {
+    try {
+      var s = JSON.parse(localStorage.getItem('cornerClipMaker') || '{}');
+      Object.keys(s).forEach(function (k) { var el = $(k); if (!el) return; if (el.type === 'checkbox') el.checked = !!s[k]; else el.value = s[k]; });
+      var k = localStorage.getItem('cornerClipKey'); if (k) $('key').value = k;
+    } catch (e) {}
+  }
+  load();
+  Array.prototype.forEach.call(document.querySelectorAll('input,select'), function (el) { el.addEventListener('change', save); });
+
+  function cfg() {
+    return { model: $('model').value.trim() || 'eleven_v3', stability: parseFloat($('stability').value),
+      speed: { calm: +$('spCalm').value, firm: +$('spFirm').value, urgent: +$('spUrgent').value } };
+  }
+  function jobs() { return J.buildJobs({ tags: $('tags').checked }); }
+  function keyOf(j) { return $('folder').value + '/' + j.style + '/' + j.slug; }
+
+  function log(msg, cls) {
+    var l = $('log'), d = document.createElement('div');
+    if (cls) d.className = cls; d.textContent = msg; l.appendChild(d); l.scrollTop = l.scrollHeight;
+  }
+
+  // ---- IndexedDB (falls back to memory) ----
+  var dbp = null;
+  function db() {
+    if (dbp) return dbp;
+    dbp = new Promise(function (res) {
+      try {
+        var r = indexedDB.open('cornerClips', 1);
+        r.onupgradeneeded = function () { r.result.createObjectStore('clips', { keyPath: 'key' }); };
+        r.onsuccess = function () { res(r.result); };
+        r.onerror = function () { res(null); };
+      } catch (e) { res(null); }
+    });
+    return dbp;
+  }
+  function idbPut(rec) {
+    mem[rec.key] = rec;
+    return db().then(function (d) { return new Promise(function (res) { if (!d) return res(); var t = d.transaction('clips', 'readwrite'); t.objectStore('clips').put(rec); t.oncomplete = res; t.onerror = res; }); });
+  }
+  function idbLoad() {
+    return db().then(function (d) { return new Promise(function (res) {
+      if (!d) return res();
+      var q = d.transaction('clips').objectStore('clips').getAll();
+      q.onsuccess = function () { q.result.forEach(function (r) { mem[r.key] = r; }); res(); };
+      q.onerror = res;
+    }); });
+  }
+  function idbClear() {
+    mem = {};
+    return db().then(function (d) { return new Promise(function (res) { if (!d) return res(); var t = d.transaction('clips', 'readwrite'); t.objectStore('clips').clear(); t.oncomplete = res; t.onerror = res; }); });
+  }
+  function have(key) { return !!mem[key] || !!oldKeys[key]; }
+  function refreshSaved() {
+    var n = Object.keys(mem).length;
+    $('saved').textContent = n ? n + ' clips saved in this browser' + (Object.keys(oldKeys).length ? ' (plus ' + Object.keys(oldKeys).length + ' from your old manifest).' : '.') : 'No clips saved yet.';
+  }
+
+  // ---- API ----
+  function headers() { return { 'xi-api-key': $('key').value.trim(), 'Content-Type': 'application/json', 'Accept': 'audio/mpeg' }; }
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+
+  function readCredits() {
+    return fetch(API + '/v1/user/subscription', { headers: { 'xi-api-key': $('key').value.trim() } }).then(function (r) {
+      if (!r.ok) throw new Error(r.status);
+      return r.json();
+    }).then(function (j) {
+      creditInfo = { used: j.character_count, limit: j.character_limit, reset: j.next_character_count_reset_unix };
+      return creditInfo;
+    }).catch(function () { creditInfo = null; return null; });
+  }
+  function remaining() {
+    if (creditInfo) return creditInfo.limit - creditInfo.used;
+    return (+$('avail').value || 0) - localSpent;
+  }
+  var localSpent = 0;
+  function showCredits() {
+    var c = $('credits');
+    if (creditInfo) {
+      var when = creditInfo.reset ? new Date(creditInfo.reset * 1000).toLocaleDateString() : 'unknown';
+      c.innerHTML = 'Used <span class="stat">' + creditInfo.used + '</span> of <span class="stat">' + creditInfo.limit + '</span>. Remaining <span class="stat">' + (creditInfo.limit - creditInfo.used) + '</span>. Resets ' + when + '.';
+    } else {
+      c.textContent = 'Could not read credits from your account. Counting locally against ' + $('avail').value + ' credits instead.';
+    }
+  }
+
+  // One request, with fallbacks if the model rejects a voice setting.
+  async function tts(job) {
+    var c = cfg(), voice = $('voiceId').value.trim();
+    var url = API + '/v1/text-to-speech/' + encodeURIComponent(voice) + '?output_format=mp3_44100_128';
+    for (var tries = 0; tries < 6; tries++) {
+      var res = await fetch(url, { method: 'POST', headers: headers(), body: JSON.stringify(J.requestBody(job, c, speedLevel)) });
+      if (res.ok) return await res.blob();
+      var text = ''; try { text = await res.text(); } catch (e) {}
+      if (res.status === 401) throw Object.assign(new Error('The API key was rejected (401). ' + text.slice(0, 200)), { fatal: true });
+      if (res.status === 429 || res.status >= 500) { log('Busy (' + res.status + '). Waiting 5 seconds.'); await sleep(5000); continue; }
+      if ((res.status === 400 || res.status === 422) && speedLevel < 2 && /voice_settings|speed|stability|setting/i.test(text)) {
+        speedLevel++; log('The model rejected a voice setting. Retrying ' + (speedLevel === 1 ? 'without speed' : 'with default voice settings') + '.', 'err'); continue;
+      }
+      var fatal = res.status === 402 || /quota|credit|limit|not available for free|paid/i.test(text);
+      throw Object.assign(new Error(res.status + ' ' + text.slice(0, 300)), { fatal: fatal });
+    }
+    throw new Error('Gave up after repeated retries.');
+  }
+
+  function need() {
+    if (!$('key').value.trim()) { alert('Paste your ElevenLabs API key first.'); return false; }
+    if (!$('voiceId').value.trim()) { alert('Enter the Voice ID first.'); return false; }
+    return true;
+  }
+
+  // ---- buttons ----
+  $('btnCredits').onclick = function () { save(); if (!$('key').value.trim()) return alert('Paste your ElevenLabs API key first.'); readCredits().then(showCredits); };
+
+  $('btnTest').onclick = async function () {
+    if (!need()) return; save();
+    var parts = $('testPick').value.split('|'), style = parts[0], text = parts[1];
+    var job = jobs().filter(function (j) { return j.style === style && j.original === text; })[0];
+    if (!job) { $('testInfo').textContent = 'That phrase has no clip in the plan for this style.'; return; }
+    $('btnTest').disabled = true; $('testInfo').textContent = 'Making clip...';
+    try {
+      await readCredits();
+      var before = creditInfo ? creditInfo.used : null;
+      var blob = await tts(job);
+      await idbPut({ key: keyOf(job), blob: blob, say: job.say, chars: job.chars });
+      var after = null;
+      if (before !== null) { await readCredits(); after = creditInfo ? creditInfo.used : null; }
+      var cost = (before !== null && after !== null) ? after - before : null;
+      if (cost && job.chars) rate = cost / job.chars;
+      $('testInfo').textContent = 'Sent: ' + job.say + '   |   ' + job.chars + ' characters' + (cost !== null ? ', cost ' + cost + ' credits (' + rate.toFixed(2) + ' per character)' : '');
+      var p = $('player'); p.hidden = false; p.src = URL.createObjectURL(blob); p.play().catch(function () {});
+      showCredits(); refreshSaved();
+    } catch (e) { $('testInfo').textContent = 'Failed: ' + e.message; }
+    $('btnTest').disabled = false;
+  };
+
+  $('btnPlan').onclick = async function () {
+    save();
+    var all = jobs(), todo = all.filter(function (j) { return !have(keyOf(j)); });
+    if ($('key').value.trim()) { await readCredits(); showCredits(); }
+    var rem = remaining(), cum = 0, rows = '';
+    var byTier = {};
+    todo.forEach(function (j) { var t = byTier[j.tier] = byTier[j.tier] || { name: j.tierName, n: 0, c: 0 }; t.n++; t.c += j.chars; });
+    Object.keys(byTier).forEach(function (k) {
+      var t = byTier[k]; cum += t.c * rate;
+      rows += '<tr><td>' + k + '</td><td>' + t.name + '</td><td>' + t.n + '</td><td>' + Math.round(t.c * rate) + '</td><td>' + (cum <= rem - (+$('reserve').value) ? 'Fits' : 'Over') + '</td></tr>';
+    });
+    $('plan').innerHTML = '<p class="note">' + all.length + ' clips in total, ' + todo.length + ' still to make. Credits remaining: <span class="stat">' + rem + '</span>.</p>' +
+      '<table><tr><th>#</th><th>Group</th><th>Clips</th><th>Credits</th><th>Cumulative</th></tr>' + rows + '</table>' +
+      '<p class="note">Groups run top to bottom. It stops cleanly when the next clip would dip into your reserve.</p>';
+  };
+
+  $('btnStart').onclick = async function () {
+    if (running) return; if (!need()) return; save();
+    running = true; stopFlag = false; $('btnStart').disabled = true; $('btnStop').disabled = false;
+    localSpent = 0;
+    await readCredits(); showCredits();
+    var all = jobs(), todo = all.filter(function (j) { return !have(keyOf(j)); });
+    log('Starting. ' + todo.length + ' clips to make, ' + remaining() + ' credits available.');
+    var done = 0, reserve = +$('reserve').value || 0, sinceCheck = 0, reason = '';
+    for (var i = 0; i < todo.length; i++) {
+      if (stopFlag) { reason = 'Stopped by you.'; break; }
+      var j = todo[i], cost = Math.ceil(j.chars * rate);
+      if (remaining() - cost < reserve) { reason = 'Stopped before running out of credits (' + remaining() + ' left, reserve ' + reserve + '). Next up was group ' + j.tier + ': ' + j.tierName + '.'; break; }
+      try {
+        var blob = await tts(j);
+        await idbPut({ key: keyOf(j), blob: blob, say: j.say, chars: j.chars });
+        localSpent += cost; if (creditInfo) creditInfo.used += cost;
+        done++; sinceCheck++;
+        log('Made ' + keyOf(j) + '   ' + j.say, 'ok');
+        if (sinceCheck >= 10) { sinceCheck = 0; var before = creditInfo ? creditInfo.used : 0; var ok = await readCredits(); if (ok) showCredits(); }
+      } catch (e) {
+        log('Error on "' + j.original + '": ' + e.message, 'err');
+        if (e.fatal) { reason = 'Stopped: ' + e.message; break; }
+      }
+      $('barfill').style.width = ((i + 1) / todo.length * 100) + '%';
+      $('progress').textContent = done + ' made this run. ' + (todo.length - i - 1) + ' left in the plan.';
+      refreshSaved();
+      await sleep(150);
+    }
+    if (!reason) reason = 'All clips in the plan are made.';
+    log(reason, reason.indexOf('All clips') === 0 ? 'ok' : 'err');
+    $('progress').textContent = done + ' clips made this run. ' + reason;
+    await readCredits(); showCredits(); refreshSaved();
+    running = false; $('btnStart').disabled = false; $('btnStop').disabled = true;
+  };
+  $('btnStop').onclick = function () { stopFlag = true; $('btnStop').disabled = true; };
+
+  $('oldManifest').onchange = function (e) {
+    var f = e.target.files[0]; if (!f) return;
+    f.text().then(function (t) {
+      var j = JSON.parse(t); oldKeys = {};
+      (j.clips || []).forEach(function (k) { oldKeys[k] = 1; });
+      log('Loaded ' + Object.keys(oldKeys).length + ' clip names from your manifest.'); refreshSaved();
+    }).catch(function () { log('That file is not a valid manifest.', 'err'); });
+  };
+
+  // ---- zip (store only; mp3 is already compressed) ----
+  var CRC = (function () { var t = []; for (var n = 0; n < 256; n++) { var c = n; for (var k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+  function crc32(u8) { var c = 0xFFFFFFFF; for (var i = 0; i < u8.length; i++) c = CRC[(c ^ u8[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+  function zip(files) {
+    var enc = new TextEncoder(), chunks = [], central = [], offset = 0;
+    function u16(v) { return [v & 255, (v >>> 8) & 255]; }
+    function u32(v) { return [v & 255, (v >>> 8) & 255, (v >>> 16) & 255, (v >>> 24) & 255]; }
+    files.forEach(function (f) {
+      var name = enc.encode(f.name), crc = crc32(f.data), size = f.data.length;
+      var head = new Uint8Array([0x50, 0x4b, 3, 4].concat(u16(20), u16(0x0800), u16(0), u16(0), u16(0x21), u32(crc), u32(size), u32(size), u16(name.length), u16(0)));
+      chunks.push(head, name, f.data);
+      central.push({ name: name, crc: crc, size: size, offset: offset });
+      offset += head.length + name.length + size;
+    });
+    var cdStart = offset;
+    central.forEach(function (c) {
+      var h = new Uint8Array([0x50, 0x4b, 1, 2].concat(u16(20), u16(20), u16(0x0800), u16(0), u16(0), u16(0x21), u32(c.crc), u32(c.size), u32(c.size), u16(c.name.length), u16(0), u16(0), u16(0), u16(0), u32(0), u32(c.offset)));
+      chunks.push(h, c.name); offset += h.length + c.name.length;
+    });
+    var end = new Uint8Array([0x50, 0x4b, 5, 6].concat(u16(0), u16(0), u16(central.length), u16(central.length), u32(offset - cdStart), u32(cdStart), u16(0)));
+    chunks.push(end);
+    return new Blob(chunks, { type: 'application/zip' });
+  }
+
+  $('btnZip').onclick = async function () {
+    var keys = Object.keys(mem);
+    if (!keys.length) return alert('No clips saved yet.');
+    var files = [];
+    for (var i = 0; i < keys.length; i++) files.push({ name: 'audio/' + keys[i] + '.mp3', data: new Uint8Array(await mem[keys[i]].blob.arrayBuffer()) });
+    var all = {}; keys.forEach(function (k) { all[k] = 1; }); Object.keys(oldKeys).forEach(function (k) { all[k] = 1; });
+    files.push({ name: 'audio/manifest.json', data: new TextEncoder().encode(JSON.stringify({ clips: Object.keys(all).sort() }, null, 1)) });
+    var a = document.createElement('a'); a.href = URL.createObjectURL(zip(files)); a.download = 'corner-clips.zip'; document.body.appendChild(a); a.click(); a.remove();
+    log('Zip ready with ' + keys.length + ' clips and a manifest listing ' + Object.keys(all).length + '.', 'ok');
+  };
+
+  $('btnClear').onclick = async function () {
+    if (!confirm('Delete all clips saved in this browser? Download the zip first if you want to keep them.')) return;
+    await idbClear(); refreshSaved(); log('Saved clips cleared.');
+  };
+
+  idbLoad().then(refreshSaved);
+  window.__clipmaker = { mem: function () { return mem; } };
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Corner">
+<meta name="theme-color" content="#050506">
+<title>Corner: Boxing Coach</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="top">
+  <img class="logo" src="icons/icon-192.png" alt="">
+  <h1>Corner: Boxing Coach</h1>
+</header>
+
+<main id="main"></main>
+
+<nav class="tabs" id="tabs" aria-label="Main">
+  <button data-act="tab" data-v="train" class="on">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13.5" r="7.5"/><path d="M12 9.5v4l2.5 1.5M9.5 2.5h5"/></svg><span>Train</span>
+  </button>
+  <button data-act="tab" data-v="programs">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span>Programs</span>
+  </button>
+  <button data-act="tab" data-v="prompts">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg><span>Prompts</span>
+  </button>
+  <button data-act="tab" data-v="settings">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg><span>Settings</span>
+  </button>
+</nav>
+
+<div id="screen" class="screen hidden"></div>
+
+<div id="wo" class="wo hidden" aria-live="off">
+  <div class="wo-top">
+    <div class="wo-prog" id="wo-prog"></div>
+    <div class="wo-round" id="wo-round"></div>
+    <div class="wo-dots" id="wo-dots"></div>
+  </div>
+  <div class="wo-mid">
+    <div class="wo-phase" id="wo-phase"></div>
+    <div class="wo-time" id="wo-time">0:00</div>
+    <div class="wo-bar"><i id="wo-barfill"></i></div>
+    <div class="wo-call" id="wo-call"></div>
+  </div>
+  <div class="wo-bot">
+    <button class="wo-btn big" id="wo-pause" data-act="wo-pause">Pause</button>
+    <div class="wo-row">
+      <button class="wo-btn" id="wo-skip" data-act="wo-skip" hidden>Skip Rest</button>
+      <button class="wo-btn danger" data-act="wo-end">End Workout</button>
+    </div>
+    <div class="wo-note" id="wo-note"></div>
+  </div>
+</div>
+
+<div id="sheet-root"></div>
+<div id="toast" role="status"></div>
+
+<div id="launch" aria-hidden="true">
+  <svg viewBox="0 0 120 120" width="130" height="130">
+    <rect class="post" x="12" y="14" width="8" height="92" rx="4"/>
+    <rect class="post" x="100" y="14" width="8" height="92" rx="4"/>
+    <rect class="rope r1" x="14" y="32" width="92" height="9" rx="4.5"/>
+    <rect class="rope r2" x="14" y="55" width="92" height="9" rx="4.5"/>
+    <rect class="rope r3" x="14" y="78" width="92" height="9" rx="4.5"/>
+  </svg>
+</div>
+
+<script src="data.js"></script>
+<script src="coach.js"></script>
+<script src="audio.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

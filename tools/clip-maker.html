@@ -1,0 +1,993 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Corner Clip Maker</title>
+<style>
+:root { --bg:#050506; --card:#15161a; --card2:#1d1f24; --line:#2a2c32; --silver:#c4c8ce; --hi:#eef0f3; --mute:#8a8e97; --red:#ff5a5a; }
+* { box-sizing: border-box; }
+body { margin:0; background:var(--bg); color:var(--silver); font:16px/1.4 -apple-system, "Helvetica Neue", Arial, sans-serif; }
+main { max-width: 760px; margin: 0 auto; padding: 22px 16px 60px; }
+h1 { font-size: 22px; letter-spacing:.08em; text-transform:uppercase; color:var(--hi); margin:0 0 6px; }
+h2 { font-size: 12px; letter-spacing:.16em; text-transform:uppercase; color:var(--mute); margin:24px 2px 8px; }
+.card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px; margin-bottom:10px; }
+label { display:block; font-size:12px; letter-spacing:.1em; text-transform:uppercase; color:var(--mute); margin:12px 0 5px; font-weight:700; }
+label:first-child { margin-top:0; }
+input, select { width:100%; background:#0c0d0f; color:var(--hi); border:1px solid var(--line); border-radius:10px; padding:11px; font:inherit; }
+input[type=checkbox] { width:auto; margin-right:8px; }
+.check { display:flex; align-items:center; margin-top:12px; color:var(--silver); font-size:15px; text-transform:none; letter-spacing:0; }
+.grid3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
+.grid2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.note { color:var(--mute); font-size:13.5px; margin:6px 0 0; }
+.btns { display:flex; flex-wrap:wrap; gap:10px; margin-top:12px; }
+button { font:inherit; font-weight:800; letter-spacing:.06em; text-transform:uppercase; border:1px solid var(--line); background:var(--card2); color:var(--hi); border-radius:12px; min-height:48px; padding:0 16px; cursor:pointer; flex:1; min-width:140px; }
+button.primary { background:linear-gradient(180deg,#f4f5f7,#9ea2a9); color:#08090a; border:0; }
+button.danger { color:#ff8585; background:#1b0f10; border-color:#4a1d20; }
+button:disabled { opacity:.4; cursor:not-allowed; }
+.bar { height:8px; background:#1b1d21; border-radius:4px; overflow:hidden; margin:10px 0 4px; }
+.bar i { display:block; height:100%; width:0; background:var(--silver); transition:width .2s; }
+#log { background:#0a0b0d; border:1px solid var(--line); border-radius:10px; padding:10px; height:260px; overflow:auto; font:13px/1.45 ui-monospace, Menlo, monospace; white-space:pre-wrap; }
+#log .err { color:var(--red); } #log .ok { color:#9fe3b0; }
+table { width:100%; border-collapse:collapse; font-size:14px; }
+td, th { text-align:left; padding:6px 4px; border-top:1px solid var(--line); vertical-align:top; }
+th { color:var(--mute); font-size:12px; letter-spacing:.08em; text-transform:uppercase; border-top:0; }
+.stat { color:var(--hi); font-weight:700; }
+audio { width:100%; margin-top:10px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Corner Clip Maker</h1>
+  <p class="note">Makes the coach voice clips with ElevenLabs, most important first, and stops before your credits run out. Clips are saved in this browser as they are made, so closing the page never wastes credits. Run it again later and it carries on where it stopped.</p>
+
+  <h2>Setup</h2>
+  <div class="card">
+    <label for="key">ElevenLabs API Key</label>
+    <input id="key" type="password" autocomplete="off" placeholder="Paste your API key">
+    <div class="check"><input type="checkbox" id="remember"><span>Remember the key on this computer</span></div>
+    <div class="grid2">
+      <div><label for="voiceId">Voice ID</label><input id="voiceId" placeholder="From the voice in My Voices"></div>
+      <div><label for="folder">Which Coach Is This?</label>
+        <select id="folder"><option value="m1">Male Coach</option><option value="f1">Female Coach</option></select></div>
+    </div>
+    <div class="grid2">
+      <div><label for="model">Model</label><input id="model" value="eleven_v3"></div>
+      <div><label for="stability">Stability (v3)</label>
+        <select id="stability"><option value="0">Creative (most expressive)</option><option value="0.5">Natural</option><option value="1">Robust (most steady)</option></select></div>
+    </div>
+    <div class="grid3">
+      <div><label for="spCalm">Speed Calm</label><input id="spCalm" type="number" step="0.05" min="0.7" max="1.2" value="1"></div>
+      <div><label for="spFirm">Speed Firm</label><input id="spFirm" type="number" step="0.05" min="0.7" max="1.2" value="1.1"></div>
+      <div><label for="spUrgent">Speed Urgent</label><input id="spUrgent" type="number" step="0.05" min="0.7" max="1.2" value="1.2"></div>
+    </div>
+    <div class="check"><input type="checkbox" id="tags" checked><span>Add delivery tags like [shouting] (needs Eleven v3 or newer)</span></div>
+    <div class="grid2">
+      <div><label for="reserve">Credits to Keep in Reserve</label><input id="reserve" type="number" value="200" min="0"></div>
+      <div><label for="avail">Credits Available (used only if they cannot be read)</label><input id="avail" type="number" value="10000" min="0"></div>
+    </div>
+  </div>
+
+  <h2>Step 1: Check and Test</h2>
+  <div class="card">
+    <div class="btns"><button id="btnCredits">Check Credits</button></div>
+    <div id="credits" class="note">Credits not checked yet.</div>
+    <label for="testPick">Test One Clip</label>
+    <div class="grid2">
+      <select id="testPick">
+        <option value="firm|Jab, cross, hook, cross">Firm: Jab, cross, hook, cross</option>
+        <option value="urgent|Jab, cross, hook, cross">Urgent: Jab, cross, hook, cross</option>
+        <option value="firm|Hands up">Firm: Hands up</option>
+        <option value="urgent|Empty the tank">Urgent: Empty the tank</option>
+        <option value="calm|Recovery round. Your pace.">Calm: Recovery round. Your pace.</option>
+        <option value="firm|Do not get sloppy">Firm: Do not get sloppy (needling)</option>
+      </select>
+      <button id="btnTest" class="primary">Make and Play</button>
+    </div>
+    <div id="testInfo" class="note">A test clip is a real clip. It is kept, so it is not wasted.</div>
+    <audio id="player" controls hidden></audio>
+  </div>
+
+  <h2>Step 2: Plan</h2>
+  <div class="card">
+    <div class="btns"><button id="btnPlan">Show Plan</button></div>
+    <div id="plan" class="note">The plan lists each group in the order it will be made.</div>
+  </div>
+
+  <h2>Step 3: Generate</h2>
+  <div class="card">
+    <div class="btns">
+      <button id="btnStart" class="primary">Start Generating</button>
+      <button id="btnStop" class="danger" disabled>Stop</button>
+    </div>
+    <div class="bar"><i id="barfill"></i></div>
+    <div id="progress" class="note">Not started.</div>
+    <div id="log" aria-live="polite"></div>
+  </div>
+
+  <h2>Step 4: Download</h2>
+  <div class="card">
+    <div class="btns">
+      <button id="btnZip" class="primary">Download Clips Zip</button>
+      <button id="btnClear" class="danger">Clear Saved Clips</button>
+    </div>
+    <div id="saved" class="note">No clips saved yet.</div>
+    <p class="note">Unzip into your Corner folder so the <b>audio</b> folder merges, then upload to GitHub. The zip includes the manifest that tells the app which clips exist.</p>
+    <label for="oldManifest">Already Have Clips From Before? Add Their Manifest</label>
+    <input id="oldManifest" type="file" accept=".json">
+    <p class="note">Optional. Choose your existing audio/manifest.json so the new manifest lists both old and new clips, and nothing is generated twice.</p>
+  </div>
+</main>
+
+<script>
+/* Corner: data model, default prompt library, programs, voices and settings. */
+(function (root, factory) {
+  var api = factory();
+  if (typeof module === 'object' && module.exports) module.exports = api;
+  else root.CornerData = api;
+})(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+
+  var LEVELS = [
+    { id: 'novice', label: 'Novice', rank: 1 },
+    { id: 'intermediate', label: 'Intermediate', rank: 2 },
+    { id: 'advanced', label: 'Advanced', rank: 3 }
+  ];
+
+  // pick:true categories can be weighted inside a program. The rest are used automatically by the coach.
+  var CATEGORIES = [
+    { id: 'combo', label: 'Combinations', pick: true },
+    { id: 'numbers', label: 'Number Combinations', pick: true },
+    { id: 'defense', label: 'Defense', pick: true },
+    { id: 'footwork', label: 'Footwork', pick: true },
+    { id: 'form', label: 'Form Tips', pick: true },
+    { id: 'cue', label: 'Short Cues', pick: true },
+    { id: 'needle', label: 'Needling', pick: true },
+    { id: 'milestone', label: 'Milestones', pick: false },
+    { id: 'motivation', label: 'Motivation', pick: false },
+    { id: 'finalPush', label: 'Final Push', pick: false },
+    { id: 'recoveryTalk', label: 'Recovery Talk', pick: false },
+    { id: 'restTalk', label: 'Rest Talk', pick: false }
+  ];
+
+  // Two coaches. Each uses the device voice picked for its gender in Settings, or recorded clips in audio/m1 and audio/f1.
+  var VOICES = [
+    { id: 'm1', gender: 'male', name: 'Male Coach', pitch: 1, rate: 1 },
+    { id: 'f1', gender: 'female', name: 'Female Coach', pitch: 1, rate: 1 }
+  ];
+
+  // Device voice fallback parameters. Recorded clips replace these when they exist.
+  var STYLES = [
+    { id: 'calm', label: 'Calm', rate: 0.92, pitch: 0.92, vol: 0.85 },
+    { id: 'firm', label: 'Firm', rate: 1.0, pitch: 0.97, vol: 1.0 },
+    { id: 'urgent', label: 'Urgent', rate: 1.17, pitch: 1.06, vol: 1.0 }
+  ];
+
+  function slug(text) {
+    return String(text).toLowerCase().replace(/\{n\}/g, 'n').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 70);
+  }
+
+  function levelRank(id) {
+    for (var i = 0; i < LEVELS.length; i++) if (LEVELS[i].id === id) return LEVELS[i].rank;
+    return 2;
+  }
+
+  var RAW = {
+    combo: {
+      novice: ['Jab, cross', 'Jab, jab, cross', 'Jab, cross, hook', 'Cross, hook', 'Double jab, cross', 'Jab to the body, jab to the head', 'Jab, cross, step back'],
+      intermediate: [
+        'Jab, cross, hook, cross', 'Jab, jab, cross, hook', 'Jab, cross, uppercut, hook', 'Jab, cross, body hook, head hook',
+        'Double jab, cross, hook', 'Jab, body jab, cross, hook', 'Jab, cross, hook, uppercut', 'Cross, hook, cross', 'Hook, cross, hook',
+        'Jab, uppercut, cross', 'Jab, cross, slip, cross', 'Jab, cross, roll, hook', 'Jab, cross, hook, step out', 'Jab, hook, cross',
+        'Body jab, cross, hook to the body', 'Cross, hook, uppercut, cross', 'Jab, cross, pivot, hook', 'Jab, jab, cross, roll, cross',
+        'Jab to the body, jab to the head, cross, hook'
+      ],
+      advanced: [
+        'Jab, cross, hook, cross, hook', 'Jab, jab, cross, slip, cross, hook', 'Jab, cross, roll, cross, hook, cross', 'Jab, feint, cross, hook',
+        'Jab, cross, body hook, head hook, cross', 'Slip, slip, cross, hook, cross', 'Jab, pull, cross, hook, roll', 'Cross, hook, step off, jab, cross',
+        'Jab, cross, uppercut, hook, cross, roll', 'Double jab, cross, hook, cross, slip', 'Jab, cross, hook, cross, uppercut, hook', 'Feint jab, cross, hook, cross'
+      ]
+    },
+    numbers: {
+      novice: ['One, two', 'One, one, two', 'One, two, three'],
+      intermediate: ['One, two, three, two', 'One, two, five, two', 'One, one, two, three', 'Two, three, two', 'Three, two, three', 'One, two, slip, two, three'],
+      advanced: ['One, two, three, two, three', 'One, one, two, five, two', 'Two, three, two, one, two', 'One, two, three, six, three, two', 'One, two, slip, two, three, two']
+    },
+    defense: {
+      novice: ['Slip left', 'Slip right', 'Parry and jab', 'Hands up, block'],
+      intermediate: ['Slip, slip, cross', 'Roll under the hook', 'Parry, cross', 'Duck and hook', 'Pull back, jab, cross', 'Block, slip, counter',
+        'Slip right, cross, hook', 'Slip left, hook, cross', 'Shell up, then fire back', 'Roll left, roll right, cross'],
+      advanced: ['Slip, roll, cross, hook', 'Pull, counter cross, hook', 'Double slip, hook, cross', 'Roll under, uppercut, cross']
+    },
+    footwork: {
+      novice: ['Move your feet', 'Circle left', 'Circle right', 'Stay light on your toes'],
+      intermediate: ['Step in, step out', 'Pivot out', 'Cut off the ring', 'Angle off to the left', 'Angle off to the right', 'Jab and move', 'Reset your stance'],
+      advanced: ['Step off the line, counter', 'Pivot, jab, cross, pivot', 'Switch the angle, then fire']
+    },
+    form: {
+      novice: ['Hands up', 'Chin down', 'Keep your elbows in', 'Breathe out on every punch', 'Stay relaxed'],
+      intermediate: ['Turn the hip on the cross', 'Snap the jab back to your chin', 'Do not drop the hand after the jab', 'Sit down on your punches',
+        'Pivot the back foot on the cross', 'Rotate the shoulder on the hook', 'Eyes up, stay loose'],
+      advanced: ['Keep the combination tight. No wasted motion.', 'Reset your balance after every combo', 'Throw with intent, not just volume']
+    },
+    cue: {
+      novice: [
+        { t: 'Hands up', f: 12 }, { t: 'Chin down', f: 12 }, { t: 'Move your feet', f: 6 }, { t: 'Watch the footwork', f: 6 },
+        { t: 'Move your head', f: 6 }, { t: 'Harder', f: 6 }, { t: 'Faster', f: 6 }, { t: "Let's go", f: 6 }, { t: 'Breathe', f: 6 },
+        { t: 'Watch the shoulder', f: 3 }, { t: 'Stay loose', f: 3 }, { t: 'Elbows in', f: 3 }, { t: 'Reset your stance', f: 3 },
+        { t: 'Work the body', f: 3 }, { t: 'Snap it back', f: 3 }, { t: 'Sharper', f: 3 }, { t: 'Keep it tight', f: 3 },
+        { t: 'Do not drop that right hand', f: 3 }, { t: 'Soft knees', f: 3 }, { t: 'Step back out', f: 1 }
+      ]
+    },
+    needle: {
+      novice: [
+        { t: 'Do not get sloppy', f: 3 }, { t: 'You are looking tired', f: 3 }, { t: 'Do not tell me you are tired', f: 3 },
+        { t: 'Hands are dropping', f: 3 }, { t: 'Do not quit on me now', f: 3 }, { t: 'That was sloppy. Tighten it up.', f: 1 },
+        { t: 'Come on, show me something', f: 1 }, { t: 'Is that all you have got?', f: 1 }
+      ]
+    },
+    milestone: {
+      novice: [
+        { t: "All right, we're warming up. Let's get into it.", at: 'open' },
+        { t: 'Nice and easy to start. Find your rhythm.', at: 'open' },
+        { t: "Let's go. Loosen up and stay light.", at: 'open' },
+        { t: 'Quarter of the way. Keep working.', at: 'q1' },
+        { t: 'Good start. Keep it going.', at: 'q1' },
+        { t: "All right, we're working our way in.", at: 'q1' },
+        { t: 'Halfway. What have you got left?', at: 'half' },
+        { t: "Halfway there. Show me what you've got.", at: 'half' },
+        { t: "Half done. Keep going, don't stop now.", at: 'half' },
+        { t: 'Three quarters of the way. Stay strong.', at: 'q3' },
+        { t: 'Strong finish coming. Stay with it.', at: 'q3' },
+        { t: 'Almost there. Do not let up.', at: 'q3' },
+        { t: 'Ninety percent. This is where it counts.', at: 'late' },
+        { t: 'Ten percent left. Make it count.', at: 'late' },
+        { t: "Strong finish. You're almost there.", at: 'late' },
+        { t: 'Halfway through the last round. Keep digging.', at: 'half', scope: 'final' },
+        { t: 'Three quarters through the last round. Leave it all in here.', at: 'q3', scope: 'final' },
+        { t: 'This is what makes champions. Make it or break it.', at: 'late', scope: 'final' },
+        { t: 'Last stretch. This is what makes champions.', at: 'late', scope: 'final' },
+        { t: 'Make it or break it. Finish strong.', at: 'late', scope: 'final' }
+      ]
+    },
+    motivation: {
+      novice: ['Keep it going', 'Stay sharp', 'Let us go, let us work', 'Find your rhythm', 'Do not ease up', 'You are doing great. Keep pushing.',
+        'Bring the intensity', 'Work, work, work', 'Stay focused', 'Punch with intent', 'Make every shot count', 'Dig in',
+        'This is where it counts', 'Good work. Stay on it.', 'Push through it. You are stronger than you think.', 'Sharper. Faster. Stay tight.']
+    },
+    finalPush: {
+      novice: ['Empty the tank', 'Finish strong', 'Leave nothing behind', 'Push, push, push', 'Everything you have got, right now',
+        'This is the round that counts. Dig deep.', 'Go, go, go. Do not stop.', 'Last push. Make it count.', 'Hands fast. No rest.', 'Fire it all out']
+    },
+    recoveryTalk: {
+      novice: ['Stay loose. Stay moving.', 'Breathe. Keep your hands up.', 'Your pace. Your rhythm.', 'Pick it up if you feel good', 'Shake out the shoulders',
+        'Slow and smooth', 'Light shots. Good form.', 'Keep moving your feet', 'Easy does it. Stay active.']
+    },
+    restTalk: {
+      novice: ['Good round. Breathe.', 'Slow, deep breaths', 'Take a drink', 'Shake it out', 'Hands down. Relax your shoulders.',
+        'Next round, we pick it up', 'Nice work. Recover.', 'Stay on your feet. Walk it off.']
+    }
+  };
+
+  function defaultPrompts() {
+    var out = [];
+    Object.keys(RAW).forEach(function (cat) {
+      Object.keys(RAW[cat]).forEach(function (lvl) {
+        RAW[cat][lvl].forEach(function (item) {
+          var o = typeof item === 'string' ? { t: item } : item;
+          var p = { id: cat + '-' + slug(o.t), category: cat, level: lvl, text: o.t, freq: o.f || 3, enabled: true, builtin: true };
+          if (o.at) { p.at = o.at; p.scope = o.scope || 'round'; }
+          out.push(p);
+        });
+      });
+    });
+    return out;
+  }
+
+  var FREQS = [{ v: 1, l: 'Rarely' }, { v: 3, l: 'Sometimes' }, { v: 6, l: 'Often' }, { v: 12, l: 'Constantly' }];
+  var MILESTONE_AT = [{ v: 'open', l: 'Start of Workout' }, { v: 'q1', l: 'Quarter Way' }, { v: 'half', l: 'Halfway' }, { v: 'q3', l: 'Three Quarters' }, { v: 'late', l: 'Ninety Percent' }];
+  var MILESTONE_SCOPE = [{ v: 'round', l: 'Every Round' }, { v: 'final', l: 'Final Round Only' }];
+
+  var DEFAULT_CALLS = {
+    ready: 'Get ready',
+    first: 'Round one. Let us get to work.',
+    round: 'Round {n}',
+    last: 'Final round. Give me everything.',
+    recovery: 'Recovery round. Your pace.',
+    free: 'Free boxing. Round {n}. Your pace.',
+    thirty: 'Thirty seconds left. Finish strong.',
+    warn: 'Ten seconds',
+    complete: 'Workout complete. Great work.'
+  };
+
+  var CALL_LABELS = [
+    ['ready', 'Get Ready'],
+    ['first', 'First Round'],
+    ['round', 'Round Start (use {n} for the number)'],
+    ['last', 'Final Round'],
+    ['recovery', 'Recovery Round'],
+    ['free', 'Free Boxing Round (use {n} for the number)'],
+    ['thirty', 'Thirty Seconds Left'],
+    ['warn', 'Warning Call'],
+    ['complete', 'Workout Complete']
+  ];
+
+  function defaultSettings() {
+    return {
+      selectedProgram: 'prog-classic',
+      level: 'intermediate',
+      coachVol: 1,
+      fxVol: 0.9,
+      useClips: true,
+      warnSec: 10,
+      fiveCue: false,
+      spokenWarn: false,
+      thirtyCall: true,
+      bellStrikes: 1,
+      keepAwake: true,
+      timerColor: 'red',
+      timerSize: 'large',
+      deviceVoices: { male: '', female: '' },
+      calls: JSON.parse(JSON.stringify(DEFAULT_CALLS))
+    };
+  }
+
+  function newProgram(level) {
+    return {
+      id: 'prog-' + Date.now().toString(36) + Math.floor(Math.random() * 1000).toString(36),
+      name: 'New Program',
+      mode: 'coached',
+      level: level || 'intermediate',
+      rounds: 6,
+      roundSec: 180,
+      restSec: 60,
+      getReady: 10,
+      recoveryCount: 1,
+      recoveryPlacement: 'even',
+      recoveryList: [],
+      voice: 'm1',
+      style: 'auto',
+      intensity: 2,
+      ramp: true,
+      gap: 3,
+      motivation: 2,
+      finalPush: true,
+      recoveryTalk: true,
+      content: { combo: 3, cue: 3, numbers: 1, defense: 1, footwork: 1, form: 1, needle: 1 },
+      comboLength: 'any',
+      milestones: true
+    };
+  }
+
+  function prog(id, over) {
+    var p = newProgram('intermediate');
+    p.id = id;
+    Object.keys(over).forEach(function (k) {
+      if (k === 'content') p.content = Object.assign(p.content, over.content);
+      else p[k] = over[k];
+    });
+    return p;
+  }
+
+  function defaultPrograms() {
+    return [
+      prog('prog-classic', { name: 'Intermediate Classic', rounds: 6, roundSec: 180, restSec: 60, recoveryCount: 1, voice: 'm1' }),
+      prog('prog-grind', { name: 'Eight Round Grind', rounds: 8, roundSec: 180, restSec: 60, recoveryCount: 2, voice: 'm1', motivation: 3, gap: 3 }),
+      prog('prog-power', { name: 'Power and Speed', rounds: 10, roundSec: 120, restSec: 30, recoveryCount: 2, voice: 'f1', style: 'urgent', intensity: 3, gap: 2, motivation: 2, content: { needle: 2 } }),
+      prog('prog-defense', { name: 'Defense and Counters', rounds: 5, roundSec: 180, restSec: 60, recoveryCount: 1, voice: 'f1', gap: 4, content: { combo: 2, cue: 2, numbers: 0, defense: 3, footwork: 2, form: 1, needle: 1 } }),
+      prog('prog-tech', { name: 'Technique Rounds', level: 'novice', rounds: 4, roundSec: 180, restSec: 60, recoveryCount: 1, voice: 'f1', style: 'calm', intensity: 1, gap: 5, motivation: 1, content: { combo: 3, cue: 2, numbers: 1, defense: 1, footwork: 2, form: 3, needle: 0 } }),
+      prog('prog-free', { name: 'Free Boxing', mode: 'free', rounds: 5, roundSec: 180, restSec: 60, voice: 'm1', recoveryTalk: false })
+    ];
+  }
+
+  return {
+    LEVELS: LEVELS, CATEGORIES: CATEGORIES, VOICES: VOICES, STYLES: STYLES, DEFAULT_CALLS: DEFAULT_CALLS, CALL_LABELS: CALL_LABELS,
+    slug: slug, levelRank: levelRank, defaultPrompts: defaultPrompts, defaultSettings: defaultSettings,
+    defaultPrograms: defaultPrograms, newProgram: newProgram, RAW: RAW, FREQS: FREQS, MILESTONE_AT: MILESTONE_AT, MILESTONE_SCOPE: MILESTONE_SCOPE
+  };
+});
+
+</script>
+<script>
+/* Corner: pure coaching logic (timeline, recovery placement, prompt picking, delivery style). No DOM. */
+(function (root, factory) {
+  var isNode = typeof module === 'object' && module.exports;
+  var api = factory(isNode ? require('./data.js') : root.CornerData);
+  if (isNode) module.exports = api;
+  else root.CornerCoach = api;
+})(typeof self !== 'undefined' ? self : this, function (D) {
+  'use strict';
+
+  var ONES = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen',
+    'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen'];
+  var TENS = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'];
+
+  function numberWord(n) {
+    n = Math.max(0, Math.min(99, Math.floor(n)));
+    if (n < 20) return ONES[n];
+    var t = Math.floor(n / 10), o = n % 10;
+    return TENS[t] + (o ? '-' + ONES[o] : '');
+  }
+
+  function fmt(sec) {
+    sec = Math.max(0, Math.ceil(sec));
+    var m = Math.floor(sec / 60), s = sec % 60;
+    return m + ':' + (s < 10 ? '0' : '') + s;
+  }
+
+  function shuffle(arr, rng) {
+    var a = arr.slice();
+    for (var i = a.length - 1; i > 0; i--) {
+      var j = Math.floor(rng() * (i + 1));
+      var t = a[i]; a[i] = a[j]; a[j] = t;
+    }
+    return a;
+  }
+
+  function range(a, b) {
+    var out = [];
+    for (var i = a; i <= b; i++) out.push(i);
+    return out;
+  }
+
+  // Which round numbers are recovery rounds (the boxer sets their own pace).
+  function recoverySet(p, rng) {
+    rng = rng || Math.random;
+    var total = p.rounds;
+    if (p.mode === 'free') return new Set(range(1, total));
+    if (p.recoveryPlacement === 'custom') {
+      return new Set((p.recoveryList || []).filter(function (r) { return r >= 1 && r <= total; }));
+    }
+    var elig = range(1, total);
+    if (total >= 3) elig = elig.filter(function (r) { return r !== 1 && r !== total; });
+    var c = Math.max(0, Math.min(p.recoveryCount || 0, elig.length));
+    if (!c) return new Set();
+    if (p.recoveryPlacement === 'random') return new Set(shuffle(elig, rng).slice(0, c));
+    var out = new Set();
+    for (var k = 0; k < c; k++) {
+      var idx = Math.round(((k + 1) * (elig.length + 1)) / (c + 1)) - 1;
+      idx = Math.max(0, Math.min(elig.length - 1, idx));
+      out.add(elig[idx]);
+    }
+    return out;
+  }
+
+  function buildTimeline(p, rng) {
+    var rec = recoverySet(p, rng);
+    var segs = [];
+    if (p.getReady > 0) segs.push({ type: 'ready', dur: p.getReady, n: 0 });
+    for (var r = 1; r <= p.rounds; r++) {
+      segs.push({ type: 'round', n: r, dur: p.roundSec, recovery: rec.has(r) });
+      if (r < p.rounds && p.restSec > 0) segs.push({ type: 'rest', n: r, dur: p.restSec });
+    }
+    return { segs: segs, recovery: rec };
+  }
+
+  function totalSeconds(segs) {
+    return segs.reduce(function (a, s) { return a + s.dur; }, 0);
+  }
+
+  function fillCall(template, n) {
+    return String(template).replace(/\{n\}/g, numberWord(n));
+  }
+
+  function punchCount(text) {
+    return String(text).split(',').length;
+  }
+
+  var GAP_BASE = 0.3; // extra seconds per punch so the boxer can finish throwing before the next call
+
+  function chooseCategory(p, ctx, rng) {
+    if (ctx.phase === 'rest') return 'restTalk';
+    if (ctx.phase === 'recovery') return 'recoveryTalk';
+    var mot = [0, 0.08, 0.16, 0.28][p.motivation] || 0;
+    if (p.finalPush && ctx.remaining <= 30 && ctx.roundSec >= 60 && rng() < 0.55) return 'finalPush';
+    if (rng() < mot) return 'motivation';
+    var weights = [], sum = 0;
+    D.CATEGORIES.forEach(function (c) {
+      if (!c.pick) return;
+      var w = (p.content && p.content[c.id]) || 0;
+      if (w > 0) { weights.push([c.id, w]); sum += w; }
+    });
+    if (!sum) return 'combo';
+    var x = rng() * sum;
+    for (var i = 0; i < weights.length; i++) {
+      x -= weights[i][1];
+      if (x <= 0) return weights[i][0];
+    }
+    return weights[weights.length - 1][0];
+  }
+
+  function pickPrompt(prompts, p, ctx, rng) {
+    rng = rng || Math.random;
+    var rank = D.levelRank(p.level);
+    var cat = chooseCategory(p, ctx, rng);
+    var recent = ctx.recent || [];
+
+    function usable(category, avoidRecent) {
+      return prompts.filter(function (x) {
+        if (x.category !== category || x.enabled === false) return false;
+        if (D.levelRank(x.level) > rank) return false;
+        // Real coaches repeat short cues, so only the last two are blocked for those.
+        var window_ = (category === 'cue' || category === 'needle') ? recent.slice(-2) : recent;
+        if (avoidRecent && window_.indexOf(x.id) !== -1) return false;
+        if ((category === 'combo' || category === 'numbers') && p.comboLength && p.comboLength !== 'any') {
+          var n = punchCount(x.text);
+          if (p.comboLength === 'short' && n > 3) return false;
+          if (p.comboLength === 'long' && n < 4) return false;
+        }
+        return true;
+      });
+    }
+
+    var list = usable(cat, true);
+    if (!list.length) list = usable(cat, false);
+    if (!list.length && cat !== 'combo') { cat = 'combo'; list = usable(cat, true); if (!list.length) list = usable(cat, false); }
+    if (!list.length) return null;
+
+    var total = 0;
+    var weighted = list.map(function (x) {
+      var w = (x.level === p.level ? 3 : 1) * (x.freq || 3); // exact level favored, then per-prompt frequency
+      total += w;
+      return [x, w];
+    });
+    var r = rng() * total;
+    for (var i = 0; i < weighted.length; i++) {
+      r -= weighted[i][1];
+      if (r <= 0) return { prompt: weighted[i][0], category: cat };
+    }
+    return { prompt: weighted[weighted.length - 1][0], category: cat };
+  }
+
+  var MILESTONES = [{ at: 'q1', p: 0.25 }, { at: 'half', p: 0.5 }, { at: 'q3', p: 0.75 }, { at: 'late', p: 0.9 }];
+
+  // Milestone call for a point in the round. In the final round, dramatic "final" lines win when any exist.
+  function pickMilestone(prompts, p, at, isFinal, recent, rng) {
+    rng = rng || Math.random; recent = recent || [];
+    var all = prompts.filter(function (x) { return x.category === 'milestone' && x.enabled !== false && x.at === at; });
+    var list = isFinal ? all.filter(function (x) { return x.scope === 'final'; }) : [];
+    if (!list.length) list = all.filter(function (x) { return x.scope !== 'final'; });
+    var fresh = list.filter(function (x) { return recent.indexOf(x.id) === -1; });
+    if (fresh.length) list = fresh;
+    if (!list.length) return null;
+    return list[Math.floor(rng() * list.length)];
+  }
+
+  // Delivery style for a given moment. progress is 0 to 1 through the round.
+  function styleFor(p, category, progress, phase) {
+    var order = ['calm', 'firm', 'urgent'];
+    var s;
+    if (phase === 'recovery' || phase === 'rest') return 'calm';
+    if (p.style && p.style !== 'auto') {
+      s = p.style;
+      if (p.ramp && progress > 0.8 && s !== 'urgent') s = order[order.indexOf(s) + 1];
+      return s;
+    }
+    if (category === 'finalPush') return 'urgent';
+    if (category === 'motivation') return progress > 0.5 ? 'urgent' : 'firm';
+    if (category === 'form') return progress < 0.5 ? 'calm' : 'firm';
+    s = 'firm';
+    if (p.ramp && progress > 0.8) s = 'urgent';
+    return s;
+  }
+
+  // Punctuation nudges most device voices toward the intended delivery.
+  function ttsText(text, style) {
+    var t = String(text).trim().replace(/[.!?]+$/, '');
+    if (style === 'urgent') return t.replace(/\.\s+/g, '! ') + '!';
+    return t + '.';
+  }
+
+  function gapFor(p, seg, progress, remaining, lastPrompt, rng) {
+    rng = rng || Math.random;
+    var jitter = 0.85 + rng() * 0.3;
+    if (seg.type === 'rest') return 16 * jitter;
+    if (seg.recovery) return (22 + rng() * 8);
+    var g = p.gap;
+    if (p.ramp && progress > 0.8) g *= 0.8;
+    if (lastPrompt && lastPrompt.category === 'cue') g *= 0.7;
+    if (lastPrompt && (lastPrompt.category === 'combo' || lastPrompt.category === 'numbers')) {
+      g += punchCount(lastPrompt.prompt.text) * GAP_BASE;
+    }
+    return g * jitter;
+  }
+
+  function roundCallText(seg, p, total, calls) {
+    if (p.mode === 'free') return fillCall(calls.free, seg.n);
+    if (seg.recovery) return calls.recovery;
+    if (seg.n === 1) return calls.first;
+    if (seg.n === total) return calls.last;
+    return fillCall(calls.round, seg.n);
+  }
+
+  function describeRecovery(p) {
+    if (p.mode === 'free') return 'Free Boxing';
+    if (p.recoveryPlacement === 'custom') {
+      var n = (p.recoveryList || []).length;
+      return n ? n + (n === 1 ? ' Recovery Round' : ' Recovery Rounds') : 'No Recovery Rounds';
+    }
+    var c = p.recoveryCount || 0;
+    return c ? c + (c === 1 ? ' Recovery Round' : ' Recovery Rounds') : 'No Recovery Rounds';
+  }
+
+  return {
+    numberWord: numberWord, fmt: fmt, recoverySet: recoverySet, buildTimeline: buildTimeline, totalSeconds: totalSeconds,
+    fillCall: fillCall, pickPrompt: pickPrompt, chooseCategory: chooseCategory, styleFor: styleFor, ttsText: ttsText, gapFor: gapFor,
+    roundCallText: roundCallText, MILESTONES: MILESTONES, pickMilestone: pickMilestone, describeRecovery: describeRecovery, punchCount: punchCount
+  };
+});
+
+</script>
+<script>
+/* Corner clip jobs: which clips to generate, in what order, and how each phrase is styled for ElevenLabs.
+   Shared by tools/generate-clips.js (Node) and the browser Clip Maker.
+
+   Styling rules (edit here to change how every clip is delivered):
+   - Combinations (combo, numbers, defense, footwork) are split per punch: "Jab! Cross! Hook!"
+   - firm: confident, no tag. Needling lines get [annoyed].
+   - urgent: [shouting] plus exclamation marks, with the last word in capitals for emphasis.
+   - calm: [calm, steady voice] with plain sentences.
+   Tags only work on Eleven v3 and later models. Turn tags off for older models. */
+(function (root, factory) {
+  var isNode = typeof module === 'object' && module.exports;
+  var api = factory(isNode ? require('../data.js') : root.CornerData, isNode ? require('../coach.js') : root.CornerCoach);
+  if (isNode) module.exports = api; else root.CornerClipJobs = api;
+})(typeof self !== 'undefined' ? self : this, function (D, C) {
+  'use strict';
+
+  var COMBO_LIKE = { combo: 1, numbers: 1, defense: 1, footwork: 1 };
+  var BANG_FIRM = { cue: 1, motivation: 1, finalPush: 1, call: 1 };
+
+  function cap(s) { s = s.trim(); return s.charAt(0).toUpperCase() + s.slice(1); }
+  function stripEnd(s) { return s.trim().replace(/[.!?]+$/, ''); }
+  function sentences(t) { return (t.match(/[^.!?]+[.!?]*/g) || [t]).map(function (x) { return x.trim(); }).filter(Boolean); }
+  function parts(t) { return t.split(',').map(function (x) { return cap(x); }).filter(Boolean); }
+
+  function emphasizeLast(list) {
+    var last = list.length - 1;
+    return list.map(function (s, i) {
+      s = stripEnd(s);
+      if (i === last) { var w = s.split(' '); w[w.length - 1] = w[w.length - 1].toUpperCase(); s = w.join(' '); }
+      return s + '!';
+    }).join(' ');
+  }
+
+  // The exact text sent to ElevenLabs for a phrase in a given style.
+  function say(item, style, useTags) {
+    var t = item.text, cat = item.category, body, tag = '';
+    var combo = COMBO_LIKE[cat] && t.indexOf(',') !== -1;
+    if (style === 'urgent') {
+      body = combo ? parts(t).join('! ') + '!' : emphasizeLast(sentences(t));
+      tag = cat === 'needle' ? '[annoyed] [shouting] ' : '[shouting] ';
+    } else if (style === 'calm') {
+      body = combo ? parts(t).join('. ') + '.' : sentences(t).map(function (s) { return stripEnd(s) + '.'; }).join(' ');
+      tag = '[calm, steady voice] ';
+    } else {
+      if (combo) body = parts(t).join('! ') + '!';
+      else if (BANG_FIRM[cat]) body = sentences(t).map(function (s) { return stripEnd(s) + '!'; }).join(' ');
+      else body = sentences(t).map(function (s) { return stripEnd(s) + '.'; }).join(' ');
+      tag = cat === 'needle' ? '[annoyed] ' : '';
+    }
+    return (useTags === false ? '' : tag) + body;
+  }
+
+  // Fixed coach calls (round numbers etc.), expanded so every spoken call has a clip.
+  function callItems() {
+    var c = D.DEFAULT_CALLS, items = [];
+    function add(text, style, kind) { items.push({ text: text, category: 'call', kind: kind, only: style }); }
+    add(c.ready, 'firm', 'ready'); add(c.first, 'firm', 'first'); add(c.last, 'firm', 'last'); add(c.complete, 'firm', 'complete');
+    add(c.thirty, 'urgent', 'thirty'); add(c.warn, 'urgent', 'warn'); add(c.recovery, 'calm', 'recovery');
+    for (var n = 2; n <= 12; n++) add(C.fillCall(c.round, n), 'firm', 'round');
+    for (var m = 1; m <= 12; m++) add(C.fillCall(c.free, m), 'calm', 'free');
+    return items;
+  }
+
+  // Most useful first, so a free plan covers the clips played most often.
+  var TIERS = [
+    { name: 'Firm: short cues, milestones and round calls', style: 'firm', cats: ['cue', 'milestone'], calls: ['ready', 'first', 'round', 'last', 'complete'] },
+    { name: 'Firm: combinations and number combinations', style: 'firm', cats: ['combo', 'numbers'] },
+    { name: 'Urgent: short cues, milestones, final push and warnings', style: 'urgent', cats: ['cue', 'milestone', 'finalPush'], calls: ['thirty', 'warn'], skip: function (it) { return it.category === 'milestone' && (it.at === 'open' || it.at === 'q1'); } },
+    { name: 'Calm: recovery and rest lines', style: 'calm', cats: ['recoveryTalk', 'restTalk'], calls: ['recovery', 'free'] },
+    { name: 'Firm: everything else', style: 'firm', cats: ['defense', 'footwork', 'form', 'motivation', 'needle', 'finalPush'] },
+    { name: 'Urgent: combinations, defense and push lines', style: 'urgent', cats: ['combo', 'numbers', 'defense', 'footwork', 'motivation', 'needle'] },
+    { name: 'Calm: form tips', style: 'calm', cats: ['form'] }
+  ];
+
+  function buildJobs(opts) {
+    opts = opts || {};
+    var tags = opts.tags !== false;
+    var items = D.defaultPrompts().concat(callItems());
+    var seen = {}, jobs = [];
+    TIERS.forEach(function (tier, ti) {
+      items.forEach(function (it) {
+        var ok = it.category === 'call' ? (tier.calls || []).indexOf(it.kind) !== -1 && it.only === tier.style : tier.cats.indexOf(it.category) !== -1;
+        if (!ok || (tier.skip && tier.skip(it))) return;
+        var slug = D.slug(it.text), key = '{v}/' + tier.style + '/' + slug;
+        if (seen[key]) return;
+        seen[key] = 1;
+        var text = say(it, tier.style, tags);
+        jobs.push({ tier: ti + 1, tierName: tier.name, style: tier.style, slug: slug, original: it.text, category: it.category, say: text, chars: text.length });
+      });
+    });
+    return jobs;
+  }
+
+  var DEFAULTS = { model: 'eleven_v3', stability: 0, speed: { calm: 1.0, firm: 1.1, urgent: 1.2 }, tags: true, reserve: 200 };
+
+  // Request body for one clip. Level 0 sends speed, 1 drops speed, 2 sends no voice settings.
+  function requestBody(job, cfg, level) {
+    var b = { text: job.say, model_id: cfg.model };
+    if (level < 2) {
+      b.voice_settings = { stability: cfg.stability };
+      if (level < 1 && cfg.speed && cfg.speed[job.style]) b.voice_settings.speed = cfg.speed[job.style];
+    }
+    return b;
+  }
+
+  return { buildJobs: buildJobs, say: say, TIERS: TIERS, DEFAULTS: DEFAULTS, requestBody: requestBody };
+});
+
+</script>
+<script>
+(function () {
+  'use strict';
+  var J = window.CornerClipJobs, D = window.CornerData;
+  var API = new URLSearchParams(location.search).get('api') || 'https://api.elevenlabs.io';
+  var $ = function (id) { return document.getElementById(id); };
+  var stopFlag = false, running = false, speedLevel = 0, rate = 1, creditInfo = null;
+  var mem = {};          // key -> { blob, say, chars }
+  var oldKeys = {};      // keys from a manifest the user loaded
+
+  // ---- settings persistence (key only if asked) ----
+  function save() {
+    try {
+      var s = { voiceId: $('voiceId').value, folder: $('folder').value, model: $('model').value, stability: $('stability').value,
+        spCalm: $('spCalm').value, spFirm: $('spFirm').value, spUrgent: $('spUrgent').value, tags: $('tags').checked,
+        reserve: $('reserve').value, avail: $('avail').value, remember: $('remember').checked };
+      localStorage.setItem('cornerClipMaker', JSON.stringify(s));
+      if ($('remember').checked) localStorage.setItem('cornerClipKey', $('key').value); else localStorage.removeItem('cornerClipKey');
+    } catch (e) {}
+  }
+  function load() {
+    try {
+      var s = JSON.parse(localStorage.getItem('cornerClipMaker') || '{}');
+      Object.keys(s).forEach(function (k) { var el = $(k); if (!el) return; if (el.type === 'checkbox') el.checked = !!s[k]; else el.value = s[k]; });
+      var k = localStorage.getItem('cornerClipKey'); if (k) $('key').value = k;
+    } catch (e) {}
+  }
+  load();
+  Array.prototype.forEach.call(document.querySelectorAll('input,select'), function (el) { el.addEventListener('change', save); });
+
+  function cfg() {
+    return { model: $('model').value.trim() || 'eleven_v3', stability: parseFloat($('stability').value),
+      speed: { calm: +$('spCalm').value, firm: +$('spFirm').value, urgent: +$('spUrgent').value } };
+  }
+  function jobs() { return J.buildJobs({ tags: $('tags').checked }); }
+  function keyOf(j) { return $('folder').value + '/' + j.style + '/' + j.slug; }
+
+  function log(msg, cls) {
+    var l = $('log'), d = document.createElement('div');
+    if (cls) d.className = cls; d.textContent = msg; l.appendChild(d); l.scrollTop = l.scrollHeight;
+  }
+
+  // ---- IndexedDB (falls back to memory) ----
+  var dbp = null;
+  function db() {
+    if (dbp) return dbp;
+    dbp = new Promise(function (res) {
+      try {
+        var r = indexedDB.open('cornerClips', 1);
+        r.onupgradeneeded = function () { r.result.createObjectStore('clips', { keyPath: 'key' }); };
+        r.onsuccess = function () { res(r.result); };
+        r.onerror = function () { res(null); };
+      } catch (e) { res(null); }
+    });
+    return dbp;
+  }
+  function idbPut(rec) {
+    mem[rec.key] = rec;
+    return db().then(function (d) { return new Promise(function (res) { if (!d) return res(); var t = d.transaction('clips', 'readwrite'); t.objectStore('clips').put(rec); t.oncomplete = res; t.onerror = res; }); });
+  }
+  function idbLoad() {
+    return db().then(function (d) { return new Promise(function (res) {
+      if (!d) return res();
+      var q = d.transaction('clips').objectStore('clips').getAll();
+      q.onsuccess = function () { q.result.forEach(function (r) { mem[r.key] = r; }); res(); };
+      q.onerror = res;
+    }); });
+  }
+  function idbClear() {
+    mem = {};
+    return db().then(function (d) { return new Promise(function (res) { if (!d) return res(); var t = d.transaction('clips', 'readwrite'); t.objectStore('clips').clear(); t.oncomplete = res; t.onerror = res; }); });
+  }
+  function have(key) { return !!mem[key] || !!oldKeys[key]; }
+  function refreshSaved() {
+    var n = Object.keys(mem).length;
+    $('saved').textContent = n ? n + ' clips saved in this browser' + (Object.keys(oldKeys).length ? ' (plus ' + Object.keys(oldKeys).length + ' from your old manifest).' : '.') : 'No clips saved yet.';
+  }
+
+  // ---- API ----
+  function headers() { return { 'xi-api-key': $('key').value.trim(), 'Content-Type': 'application/json', 'Accept': 'audio/mpeg' }; }
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+
+  function readCredits() {
+    return fetch(API + '/v1/user/subscription', { headers: { 'xi-api-key': $('key').value.trim() } }).then(function (r) {
+      if (!r.ok) throw new Error(r.status);
+      return r.json();
+    }).then(function (j) {
+      creditInfo = { used: j.character_count, limit: j.character_limit, reset: j.next_character_count_reset_unix };
+      return creditInfo;
+    }).catch(function () { creditInfo = null; return null; });
+  }
+  function remaining() {
+    if (creditInfo) return creditInfo.limit - creditInfo.used;
+    return (+$('avail').value || 0) - localSpent;
+  }
+  var localSpent = 0;
+  function showCredits() {
+    var c = $('credits');
+    if (creditInfo) {
+      var when = creditInfo.reset ? new Date(creditInfo.reset * 1000).toLocaleDateString() : 'unknown';
+      c.innerHTML = 'Used <span class="stat">' + creditInfo.used + '</span> of <span class="stat">' + creditInfo.limit + '</span>. Remaining <span class="stat">' + (creditInfo.limit - creditInfo.used) + '</span>. Resets ' + when + '.';
+    } else {
+      c.textContent = 'Could not read credits from your account. Counting locally against ' + $('avail').value + ' credits instead.';
+    }
+  }
+
+  // One request, with fallbacks if the model rejects a voice setting.
+  async function tts(job) {
+    var c = cfg(), voice = $('voiceId').value.trim();
+    var url = API + '/v1/text-to-speech/' + encodeURIComponent(voice) + '?output_format=mp3_44100_128';
+    for (var tries = 0; tries < 6; tries++) {
+      var res = await fetch(url, { method: 'POST', headers: headers(), body: JSON.stringify(J.requestBody(job, c, speedLevel)) });
+      if (res.ok) return await res.blob();
+      var text = ''; try { text = await res.text(); } catch (e) {}
+      if (res.status === 401) throw Object.assign(new Error('The API key was rejected (401). ' + text.slice(0, 200)), { fatal: true });
+      if (res.status === 429 || res.status >= 500) { log('Busy (' + res.status + '). Waiting 5 seconds.'); await sleep(5000); continue; }
+      if ((res.status === 400 || res.status === 422) && speedLevel < 2 && /voice_settings|speed|stability|setting/i.test(text)) {
+        speedLevel++; log('The model rejected a voice setting. Retrying ' + (speedLevel === 1 ? 'without speed' : 'with default voice settings') + '.', 'err'); continue;
+      }
+      var fatal = res.status === 402 || /quota|credit|limit|not available for free|paid/i.test(text);
+      throw Object.assign(new Error(res.status + ' ' + text.slice(0, 300)), { fatal: fatal });
+    }
+    throw new Error('Gave up after repeated retries.');
+  }
+
+  function need() {
+    if (!$('key').value.trim()) { alert('Paste your ElevenLabs API key first.'); return false; }
+    if (!$('voiceId').value.trim()) { alert('Enter the Voice ID first.'); return false; }
+    return true;
+  }
+
+  // ---- buttons ----
+  $('btnCredits').onclick = function () { save(); if (!$('key').value.trim()) return alert('Paste your ElevenLabs API key first.'); readCredits().then(showCredits); };
+
+  $('btnTest').onclick = async function () {
+    if (!need()) return; save();
+    var parts = $('testPick').value.split('|'), style = parts[0], text = parts[1];
+    var job = jobs().filter(function (j) { return j.style === style && j.original === text; })[0];
+    if (!job) { $('testInfo').textContent = 'That phrase has no clip in the plan for this style.'; return; }
+    $('btnTest').disabled = true; $('testInfo').textContent = 'Making clip...';
+    try {
+      await readCredits();
+      var before = creditInfo ? creditInfo.used : null;
+      var blob = await tts(job);
+      await idbPut({ key: keyOf(job), blob: blob, say: job.say, chars: job.chars });
+      var after = null;
+      if (before !== null) { await readCredits(); after = creditInfo ? creditInfo.used : null; }
+      var cost = (before !== null && after !== null) ? after - before : null;
+      if (cost && job.chars) rate = cost / job.chars;
+      $('testInfo').textContent = 'Sent: ' + job.say + '   |   ' + job.chars + ' characters' + (cost !== null ? ', cost ' + cost + ' credits (' + rate.toFixed(2) + ' per character)' : '');
+      var p = $('player'); p.hidden = false; p.src = URL.createObjectURL(blob); p.play().catch(function () {});
+      showCredits(); refreshSaved();
+    } catch (e) { $('testInfo').textContent = 'Failed: ' + e.message; }
+    $('btnTest').disabled = false;
+  };
+
+  $('btnPlan').onclick = async function () {
+    save();
+    var all = jobs(), todo = all.filter(function (j) { return !have(keyOf(j)); });
+    if ($('key').value.trim()) { await readCredits(); showCredits(); }
+    var rem = remaining(), cum = 0, rows = '';
+    var byTier = {};
+    todo.forEach(function (j) { var t = byTier[j.tier] = byTier[j.tier] || { name: j.tierName, n: 0, c: 0 }; t.n++; t.c += j.chars; });
+    Object.keys(byTier).forEach(function (k) {
+      var t = byTier[k]; cum += t.c * rate;
+      rows += '<tr><td>' + k + '</td><td>' + t.name + '</td><td>' + t.n + '</td><td>' + Math.round(t.c * rate) + '</td><td>' + (cum <= rem - (+$('reserve').value) ? 'Fits' : 'Over') + '</td></tr>';
+    });
+    $('plan').innerHTML = '<p class="note">' + all.length + ' clips in total, ' + todo.length + ' still to make. Credits remaining: <span class="stat">' + rem + '</span>.</p>' +
+      '<table><tr><th>#</th><th>Group</th><th>Clips</th><th>Credits</th><th>Cumulative</th></tr>' + rows + '</table>' +
+      '<p class="note">Groups run top to bottom. It stops cleanly when the next clip would dip into your reserve.</p>';
+  };
+
+  $('btnStart').onclick = async function () {
+    if (running) return; if (!need()) return; save();
+    running = true; stopFlag = false; $('btnStart').disabled = true; $('btnStop').disabled = false;
+    localSpent = 0;
+    await readCredits(); showCredits();
+    var all = jobs(), todo = all.filter(function (j) { return !have(keyOf(j)); });
+    log('Starting. ' + todo.length + ' clips to make, ' + remaining() + ' credits available.');
+    var done = 0, reserve = +$('reserve').value || 0, sinceCheck = 0, reason = '';
+    for (var i = 0; i < todo.length; i++) {
+      if (stopFlag) { reason = 'Stopped by you.'; break; }
+      var j = todo[i], cost = Math.ceil(j.chars * rate);
+      if (remaining() - cost < reserve) { reason = 'Stopped before running out of credits (' + remaining() + ' left, reserve ' + reserve + '). Next up was group ' + j.tier + ': ' + j.tierName + '.'; break; }
+      try {
+        var blob = await tts(j);
+        await idbPut({ key: keyOf(j), blob: blob, say: j.say, chars: j.chars });
+        localSpent += cost; if (creditInfo) creditInfo.used += cost;
+        done++; sinceCheck++;
+        log('Made ' + keyOf(j) + '   ' + j.say, 'ok');
+        if (sinceCheck >= 10) { sinceCheck = 0; var before = creditInfo ? creditInfo.used : 0; var ok = await readCredits(); if (ok) showCredits(); }
+      } catch (e) {
+        log('Error on "' + j.original + '": ' + e.message, 'err');
+        if (e.fatal) { reason = 'Stopped: ' + e.message; break; }
+      }
+      $('barfill').style.width = ((i + 1) / todo.length * 100) + '%';
+      $('progress').textContent = done + ' made this run. ' + (todo.length - i - 1) + ' left in the plan.';
+      refreshSaved();
+      await sleep(150);
+    }
+    if (!reason) reason = 'All clips in the plan are made.';
+    log(reason, reason.indexOf('All clips') === 0 ? 'ok' : 'err');
+    $('progress').textContent = done + ' clips made this run. ' + reason;
+    await readCredits(); showCredits(); refreshSaved();
+    running = false; $('btnStart').disabled = false; $('btnStop').disabled = true;
+  };
+  $('btnStop').onclick = function () { stopFlag = true; $('btnStop').disabled = true; };
+
+  $('oldManifest').onchange = function (e) {
+    var f = e.target.files[0]; if (!f) return;
+    f.text().then(function (t) {
+      var j = JSON.parse(t); oldKeys = {};
+      (j.clips || []).forEach(function (k) { oldKeys[k] = 1; });
+      log('Loaded ' + Object.keys(oldKeys).length + ' clip names from your manifest.'); refreshSaved();
+    }).catch(function () { log('That file is not a valid manifest.', 'err'); });
+  };
+
+  // ---- zip (store only; mp3 is already compressed) ----
+  var CRC = (function () { var t = []; for (var n = 0; n < 256; n++) { var c = n; for (var k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+  function crc32(u8) { var c = 0xFFFFFFFF; for (var i = 0; i < u8.length; i++) c = CRC[(c ^ u8[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+  function zip(files) {
+    var enc = new TextEncoder(), chunks = [], central = [], offset = 0;
+    function u16(v) { return [v & 255, (v >>> 8) & 255]; }
+    function u32(v) { return [v & 255, (v >>> 8) & 255, (v >>> 16) & 255, (v >>> 24) & 255]; }
+    files.forEach(function (f) {
+      var name = enc.encode(f.name), crc = crc32(f.data), size = f.data.length;
+      var head = new Uint8Array([0x50, 0x4b, 3, 4].concat(u16(20), u16(0x0800), u16(0), u16(0), u16(0x21), u32(crc), u32(size), u32(size), u16(name.length), u16(0)));
+      chunks.push(head, name, f.data);
+      central.push({ name: name, crc: crc, size: size, offset: offset });
+      offset += head.length + name.length + size;
+    });
+    var cdStart = offset;
+    central.forEach(function (c) {
+      var h = new Uint8Array([0x50, 0x4b, 1, 2].concat(u16(20), u16(20), u16(0x0800), u16(0), u16(0), u16(0x21), u32(c.crc), u32(c.size), u32(c.size), u16(c.name.length), u16(0), u16(0), u16(0), u16(0), u32(0), u32(c.offset)));
+      chunks.push(h, c.name); offset += h.length + c.name.length;
+    });
+    var end = new Uint8Array([0x50, 0x4b, 5, 6].concat(u16(0), u16(0), u16(central.length), u16(central.length), u32(offset - cdStart), u32(cdStart), u16(0)));
+    chunks.push(end);
+    return new Blob(chunks, { type: 'application/zip' });
+  }
+
+  $('btnZip').onclick = async function () {
+    var keys = Object.keys(mem);
+    if (!keys.length) return alert('No clips saved yet.');
+    var files = [];
+    for (var i = 0; i < keys.length; i++) files.push({ name: 'audio/' + keys[i] + '.mp3', data: new Uint8Array(await mem[keys[i]].blob.arrayBuffer()) });
+    var all = {}; keys.forEach(function (k) { all[k] = 1; }); Object.keys(oldKeys).forEach(function (k) { all[k] = 1; });
+    files.push({ name: 'audio/manifest.json', data: new TextEncoder().encode(JSON.stringify({ clips: Object.keys(all).sort() }, null, 1)) });
+    var a = document.createElement('a'); a.href = URL.createObjectURL(zip(files)); a.download = 'corner-clips.zip'; document.body.appendChild(a); a.click(); a.remove();
+    log('Zip ready with ' + keys.length + ' clips and a manifest listing ' + Object.keys(all).length + '.', 'ok');
+  };
+
+  $('btnClear').onclick = async function () {
+    if (!confirm('Delete all clips saved in this browser? Download the zip first if you want to keep them.')) return;
+    await idbClear(); refreshSaved(); log('Saved clips cleared.');
+  };
+
+  idbLoad().then(refreshSaved);
+  window.__clipmaker = { mem: function () { return mem; } };
+})();
+</script>
+</body>
+</html>
